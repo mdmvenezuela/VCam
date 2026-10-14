@@ -260,7 +260,7 @@ static void handleTapGesture(UITapGestureRecognizer *gesture) {
 - (void)captureOutput:(AVCaptureOutput *)output 
     didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer 
            fromConnection:(AVCaptureConnection *)connection {
-    
+    NSLog(@"[VCam] Callback de video ejecutado");
     if (g_vcamEnabled && [[MediaManager sharedManager] isRunning]) {
         CMSampleBufferRef fakeFrame = [[MediaManager sharedManager] nextVideoFrame];
         if (fakeFrame) {
@@ -297,9 +297,12 @@ static void handleTapGesture(UITapGestureRecognizer *gesture) {
         g_pickerDelegate = [[VCamImagePickerControllerDelegate alloc] init];
         
         NSString *bundleID = [[NSBundle mainBundle] bundleIdentifier];
-        if (![bundleID isEqualToString:@"com.apple.springboard"]) {
-            %init(VCamHooks);
-        }
+NSLog(@"[VCam] Tweak cargado en bundle: %@", bundleID);
+
+if (![bundleID isEqualToString:@"com.apple.springboard"]) {
+    %init(VCamHooks);
+    NSLog(@"[VCam] Hooks inicializados en: %@", bundleID);
+}
         
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), 
             dispatch_get_main_queue(), ^{
