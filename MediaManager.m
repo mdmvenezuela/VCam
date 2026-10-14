@@ -88,48 +88,120 @@
 }
 
 - (void)resetReaders {
+    if (!self.currentAsset) {
+        NSLog(@"[VCam] Error: no hay ningún vídeo cargado");
+        return;
+    }
+
+    // Liberar las referencias a los lectores anteriores.
+    self.videoOutput = nil;
+    self.audioOutput = nil;
+    self.videoReader = nil;
+    self.audioReader = nil;
+
     NSError *error = nil;
-    
-    // --- Video Reader ---
-    if (self.currentAsset) {
-        self.videoReader = [AVAssetReader assetReaderWithAsset:self.currentAsset error:&error];
-        
-        NSArray<AVAssetTrack *> *videoTracks = [self.currentAsset tracksWithMediaType:AVMediaTypeVideo];
-        if (videoTracks.count > 0) {
-            NSDictionary *settings = @{
-                (NSString *)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange)
-            };
-            self.videoOutput = [AVAssetReaderTrackOutput assetReaderTrackOutputWithTrack:videoTracks.firstObject
-                                                                          outputSettings:settings];
-            self.videoOutput.alwaysCopiesSampleData = NO;
-            [self.videoReader addOutput:self.videoOutput];
-        }
-        
-        [self.videoReader startReading];
+
+    // Preparar el lector de vídeo.
+    self.videoReader =
+        [AVAssetReader assetReaderWithAsset:self.currentAsset error:&error];
+
+    if (!self.videoReader) {
+        NSLog(@"[VCam] No se pudo crear el lector de vídeo: %@",
+              error.localizedDescription);
+        return;
     }
-    
-    // --- Audio Reader ---
-    if (self.currentAsset) {
-        self.audioReader = [AVAssetReader assetReaderWithAsset:self.currentAsset error:&error];
-        
-        NSArray<AVAssetTrack *> *audioTracks = [self.currentAsset tracksWithMediaType:AVMediaTypeAudio];
-        if (audioTracks.count > 0) {
-            NSDictionary *settings = @{
-                AVFormatIDKey: @(kAudioFormatLinearPCM),
-                AVSampleRateKey: @(44100),
-                AVNumberOfChannelsKey: @(1),
-                AVLinearPCMBitDepthKey: @(16),
-                AVLinearPCMIsFloatKey: @(NO),
-                AVLinearPCMIsBigEndianKey: @(NO),
-            };
-            self.audioOutput = [AVAssetReaderTrackOutput assetReaderTrackOutputWithTrack:audioTracks.firstObject
-                                                                          outputSettings:settings];
-            self.audioOutput.alwaysCopiesSampleData = NO;
-            [self.audioReader addOutput:self.audioOutput];
-        }
-        
-        [self.audioReader startReading];
+
+    NSArray<AVAssetTrack *> *videoTracks =
+        [self.currentAsset tracksWithMediaType:AVMediaTypeVideo];
+
+    if (videoTracks.count == 0) {
+        NSLog(@"[VCam] El archivo no contiene una pista de vídeo");
+        self.videoReader = nil;
+        return;
     }
+
+    NSDictionary *videoSettings = @{
+        (NSString *)kCVPixelBufferPixelFormatTypeKey:
+            @(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange)
+    };
+
+    self.videoOutput =
+        [AVAssetReaderTrackOutput
+            assetReaderTrackOutputWithTrack:videoTracks.firstObject
+                             outputSettings:videoSettings];
+
+    self.videoOutput.alwaysCopiesSampleData = NO;
+
+    if (![self.videoReader canAddOutput:self.videoOutput]) {
+        NSLog(@"[VCam] No se pudo añadir la salida de vídeo");
+        self.videoOutput = nil;
+        self.videoReader = nil;
+        return;
+    }
+
+    [self.videoReader addOutput:self.videoOutput];
+
+    if (![self.videoReader startReading]) {
+        NSLog(@"[VCam] No se pudo iniciar el lector de vídeo: %@",
+              self.videoReader.error.localizedDescription);
+        self.videoOutput = nil;
+        self.videoReader = nil;
+        return;
+    }
+
+    // Preparar el lector de audio, si el vídeo tiene audio.
+    NSArray<AVAssetTrack *> *audioTracks =
+        [self.currentAsset tracksWithMediaType:AVMediaTypeAudio];
+
+    if (audioTracks.count == 0) {
+        NSLog(@"[VCam] El vídeo no contiene audio");
+        return;
+    }
+
+    error = nil;
+    self.audioReader =
+        [AVAssetReader assetReaderWithAsset:self.currentAsset error:&error];
+
+    if (!self.audioReader) {
+        NSLog(@"[VCam] No se pudo crear el lector de audio: %@",
+              error.localizedDescription);
+        return;
+    }
+
+    NSDictionary *audioSettings = @{
+        AVFormatIDKey: @(kAudioFormatLinearPCM),
+        AVSampleRateKey: @44100,
+        AVNumberOfChannelsKey: @1,
+        AVLinearPCMBitDepthKey: @16,
+        AVLinearPCMIsFloatKey: @NO,
+        AVLinearPCMIsBigEndianKey: @NO
+    };
+
+    self.audioOutput =
+        [AVAssetReaderTrackOutput
+            assetReaderTrackOutputWithTrack:audioTracks.firstObject
+                             outputSettings:audioSettings];
+
+    self.audioOutput.alwaysCopiesSampleData = NO;
+
+    if (![self.audioReader canAddOutput:self.audioOutput]) {
+        NSLog(@"[VCam] No se pudo añadir la salida de audio");
+        self.audioOutput = nil;
+        self.audioReader = nil;
+        return;
+    }
+
+    [self.audioReader addOutput:self.audioOutput];
+
+    if (![self.audioReader startReading]) {
+        NSLog(@"[VCam] No se pudo iniciar el lector de audio: %@",
+              self.audioReader.error.localizedDescription);
+        self.audioOutput = nil;
+        self.audioReader = nil;
+        return;
+    }
+
+    NSLog(@"[VCam] Lectores de vídeo y audio preparados");
 }
 
 #pragma mark - Frame Generation
