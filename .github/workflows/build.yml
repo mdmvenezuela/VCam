@@ -41,6 +41,7 @@ jobs:
       run: |
         export THEOS=$HOME/theos
         export PATH=$HOME/theos/bin:$PATH
+        export THEOS_PACKAGE_SCHEME=rootless
         make clean
         make package FINALPACKAGE=1 2>&1
         echo "Build complete. Packages:"
