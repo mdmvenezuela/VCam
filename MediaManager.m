@@ -208,37 +208,77 @@
 
 - (CMSampleBufferRef)nextVideoFrame {
     if (self.mode != VCamModeVideo || !self.videoOutput) {
-        CMTime pts = CMTimeMakeWithSeconds(CACurrentMediaTime(), 1000000);
-        return [self generateBlackFrameWithSize:self.videoSize presentationTime:pts];
+        CMTime pts = CMTimeMakeWithSeconds(
+            CACurrentMediaTime(), 1000000
+        );
+
+        return [self generateBlackFrameWithSize:self.videoSize
+                               presentationTime:pts];
     }
-    
-    CMSampleBufferRef sample = [self.videoOutput copyNextSampleBuffer];
-    
-    // Handle end-of-stream: loop
+
+    CMSampleBufferRef sample =
+        [self.videoOutput copyNextSampleBuffer];
+
+    // Si terminó el vídeo, intentar reiniciar los lectores.
     if (!sample) {
-        if (self.loopPlayback) {
+        AVAssetReaderStatus status = self.videoReader.status;
+
+        if (status == AVAssetReaderStatusFailed) {
+            NSLog(@"[VCam] Error leyendo vídeo: %@",
+                  self.videoReader.error.localizedDescription);
+        }
+
+        if (self.loopPlayback &&
+            self.currentAsset &&
+            (status == AVAssetReaderStatusCompleted ||
+             status == AVAssetReaderStatusFailed)) {
+
             [self resetReaders];
-            sample = [self.videoOutput copyNextSampleBuffer];
+
+            if (self.videoReader.status == AVAssetReaderStatusReading &&
+                self.videoOutput) {
+                sample = [self.videoOutput copyNextSampleBuffer];
+            }
         }
+
+        // Si no se pudo obtener un fotograma, generar negro.
         if (!sample) {
-            CMTime pts = CMTimeMakeWithSeconds(CACurrentMediaTime(), 1000000);
-            return [self generateBlackFrameWithSize:self.videoSize presentationTime:pts];
+            CMTime pts = CMTimeMakeWithSeconds(
+                CACurrentMediaTime(), 1000000
+            );
+
+            return [self generateBlackFrameWithSize:self.videoSize
+                                   presentationTime:pts];
         }
     }
-    
-    // Re-timestamp to wall clock so AVCapture consumers see continuous PTS
-    CMTime now = CMTimeMakeWithSeconds(CACurrentMediaTime(), 1000000);
-    CMSampleBufferRef retimed = NULL;
+
+    // Crear una copia para cambiar su tiempo de presentación.
+    CMTime now = CMTimeMakeWithSeconds(
+        CACurrentMediaTime(), 1000000
+    );
+
     CMSampleBufferRef copy = NULL;
-    
-    CMSampleBufferCreateCopy(kCFAllocatorDefault, sample, &copy);
-    if (copy) {
-        CMSampleBufferSetOutputPresentationTimeStamp(copy, now);
-        retimed = copy;
-    }
+    OSStatus result =
+        CMSampleBufferCreateCopy(kCFAllocatorDefault, sample, &copy);
+
     CFRelease(sample);
-    
-    return retimed;
+
+    if (result != noErr || !copy) {
+        NSLog(@"[VCam] No se pudo copiar el fotograma: %d",
+              (int)result);
+        return NULL;
+    }
+
+    result = CMSampleBufferSetOutputPresentationTimeStamp(copy, now);
+
+    if (result != noErr) {
+        NSLog(@"[VCam] No se pudo actualizar el tiempo del fotograma: %d",
+              (int)result);
+        CFRelease(copy);
+        return NULL;
+    }
+
+    return copy;
 }
 
 - (CMSampleBufferRef)nextAudioFrame {
