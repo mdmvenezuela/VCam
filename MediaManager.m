@@ -38,29 +38,52 @@
 #pragma mark - Media Loading
 
 - (void)loadMediaFromURL:(NSURL *)url {
+    if (!url) {
+        NSLog(@"[VCam] Error: URL de vídeo inválida");
+        return;
+    }
+
     dispatch_async(_decodeQueue, ^{
-        AVAsset *asset = [AVAsset assetWithURL:url];
-        if (!asset) return;
-        
+        AVURLAsset *asset = [AVURLAsset URLAssetWithURL:url options:nil];
+
+        NSArray<AVAssetTrack *> *tracks =
+            [asset tracksWithMediaType:AVMediaTypeVideo];
+
+        if (tracks.count == 0) {
+            NSLog(@"[VCam] Error: el archivo no contiene vídeo");
+            return;
+        }
+
+        AVAssetTrack *track = tracks.firstObject;
+
+        CGSize size = CGSizeApplyAffineTransform(
+            track.naturalSize,
+            track.preferredTransform
+        );
+
+        size.width = fabs(size.width);
+        size.height = fabs(size.height);
+
+        if (size.width <= 0 || size.height <= 0) {
+            NSLog(@"[VCam] Error: dimensiones de vídeo inválidas");
+            return;
+        }
+
         self.currentAsset = asset;
         self.videoDuration = asset.duration;
-        
-        // Get video dimensions
-        NSArray<AVAssetTrack *> *tracks = [asset tracksWithMediaType:AVMediaTypeVideo];
-        if (tracks.count > 0) {
-            AVAssetTrack *track = tracks.firstObject;
-            CGSize size = track.naturalSize;
-            CGAffineTransform t = track.preferredTransform;
-            size = CGSizeApplyAffineTransform(size, t);
-            size.width = fabs(size.width);
-            size.height = fabs(size.height);
-            if (size.width > 0 && size.height > 0) {
-                self.videoSize = size;
-            }
-        }
-        
+        self.videoSize = size;
+
         [self resetReaders];
+
+        if (!self.videoReader ||
+            self.videoReader.status != AVAssetReaderStatusReading) {
+            NSLog(@"[VCam] Error al iniciar el lector de vídeo: %@",
+                  self.videoReader.error);
+            return;
+        }
+
         self.mode = VCamModeVideo;
+        NSLog(@"[VCam] Vídeo cargado correctamente");
     });
 }
 
