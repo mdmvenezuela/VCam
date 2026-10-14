@@ -18,9 +18,39 @@ static UIButton *g_floatButton = nil;
 
 @interface VCamFloatButton : UIButton
 @property (nonatomic, assign) CGPoint initialCenter;
+
+- (void)handlePan:(UIPanGestureRecognizer *)gesture;
+- (void)handleTap:(UITapGestureRecognizer *)gesture;
 @end
 
 @implementation VCamFloatButton
+
+- (void)handlePan:(UIPanGestureRecognizer *)gesture {
+    handlePanGesture(gesture);
+}
+
+- (void)handleTap:(UITapGestureRecognizer *)gesture {
+    handleTapGesture(gesture);
+}
+
+@end
+
+@interface VCamOverlayWindow : UIWindow
+@end
+
+@implementation VCamOverlayWindow
+
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+    UIView *hitView = [super hitTest:point withEvent:event];
+
+    // Dejar pasar los toques cuando caen en el fondo transparente.
+    if (hitView == self.rootViewController.view) {
+        return nil;
+    }
+
+    return hitView;
+}
+
 @end
 
 static void setupFloatButton(void);
@@ -55,7 +85,7 @@ static void setupFloatButton() {
         initWithTarget:g_floatButton action:@selector(handleTap:)];
     [g_floatButton addGestureRecognizer:tap];
     
-    g_overlayWindow = [[UIWindow alloc] initWithFrame:screen];
+    g_overlayWindow = [[VCamOverlayWindow alloc] initWithFrame:screen];
     g_overlayWindow.windowLevel = UIWindowLevelAlert + 100;
     g_overlayWindow.hidden = NO;
     g_overlayWindow.backgroundColor = [UIColor clearColor];
@@ -65,11 +95,7 @@ static void setupFloatButton() {
     [rootVC.view addSubview:g_floatButton];
     g_overlayWindow.rootViewController = rootVC;
     
-    // Register selectors on the button class
-    class_addMethod([g_floatButton class], @selector(handlePan:), 
-                    (IMP)handlePanGesture, "v@:@");
-    class_addMethod([g_floatButton class], @selector(handleTap:), 
-                    (IMP)handleTapGesture, "v@:@");
+   
 }
 
 static void handlePanGesture(UIPanGestureRecognizer *gesture) {
