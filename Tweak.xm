@@ -12,6 +12,10 @@ static BOOL g_vcamEnabled = NO;
 static UIWindow *g_overlayWindow = nil;
 static UIButton *g_floatButton = nil;
 
+static void setupFloatButton(void);
+static void handlePanGesture(UIPanGestureRecognizer *gesture);
+static void handleTapGesture(UITapGestureRecognizer *gesture);
+
 // ============================================================================
 // MARK: - 悬浮按钮 UI
 // ============================================================================
@@ -52,10 +56,6 @@ static UIButton *g_floatButton = nil;
 }
 
 @end
-
-static void setupFloatButton(void);
-static void handlePanGesture(UIPanGestureRecognizer *gesture);
-static void handleTapGesture(UITapGestureRecognizer *gesture);
 
 static void setupFloatButton() {
     if (g_floatButton) return;
