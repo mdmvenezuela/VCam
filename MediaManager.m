@@ -1,5 +1,8 @@
 #import "MediaManager.h"
 #import <CoreImage/CoreImage.h>
+#import <QuartzCore/QuartzCore.h>
+#import <math.h>
+#import <string.h>
 
 @interface MediaManager ()
 @property (nonatomic, strong) dispatch_queue_t decodeQueue;
