@@ -110,24 +110,43 @@ static UIViewController *findTopViewController(void) {
 
 @implementation VCamImagePickerControllerDelegate
 
-- (void)imagePickerController:(UIImagePickerController *)picker 
-        didFinishPickingMediaWithInfo:(NSDictionary<UIImagePickerControllerInfoKey, id> *)info {
-    [picker dismissViewControllerAnimated:YES completion:nil];
-    
+- (void)imagePickerController:(UIImagePickerController *)picker
+didFinishPickingMediaWithInfo:(NSDictionary<UIImagePickerControllerInfoKey, id> *)info {
+
     NSURL *url = info[UIImagePickerControllerMediaURL];
-    if (!url) return;
-    
-    NSURL *tempURL = [NSURL fileURLWithPath:[NSTemporaryDirectory() 
-        stringByAppendingPathComponent:@"vcam_input.mp4"]];
-    [[NSFileManager defaultManager] removeItemAtURL:tempURL error:nil];
-    [[NSFileManager defaultManager] copyItemAtURL:url toURL:tempURL error:nil];
-    
-    [[MediaManager sharedManager] loadMediaFromURL:tempURL];
-    g_vcamEnabled = YES;
-    [[MediaManager sharedManager] start];
-    if (g_floatButton) {
-        g_floatButton.backgroundColor = [UIColor colorWithRed:0.2 green:0.8 blue:0.4 alpha:0.9];
-    }
+
+    [picker dismissViewControllerAnimated:YES completion:^{
+        if (!url) {
+            NSLog(@"[VCam] No se seleccionó ningún vídeo");
+            return;
+        }
+
+        NSURL *tempURL = [NSURL fileURLWithPath:
+            [NSTemporaryDirectory() stringByAppendingPathComponent:@"vcam_input.mp4"]];
+
+        NSError *error = nil;
+
+        [[NSFileManager defaultManager] removeItemAtURL:tempURL error:nil];
+
+        if (![[NSFileManager defaultManager]
+                copyItemAtURL:url toURL:tempURL error:&error]) {
+            NSLog(@"[VCam] Error al copiar el vídeo: %@",
+                  error.localizedDescription);
+            return;
+        }
+
+        g_vcamEnabled = NO;
+        [[MediaManager sharedManager] stop];
+
+        if (g_floatButton) {
+            g_floatButton.backgroundColor =
+                [UIColor colorWithRed:0.4 green:0.4 blue:0.4 alpha:0.9];
+        }
+
+        [[MediaManager sharedManager] loadMediaFromURL:tempURL];
+
+        NSLog(@"[VCam] Vídeo enviado a MediaManager para su carga");
+    }];
 }
 
 - (void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
